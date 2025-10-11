@@ -1,0 +1,44 @@
+data:
+  num_workers: 0
+  pin_memory: false
+  test_path: ./data/UIEB/test
+  train_batch_size:
+  - 2
+  - 1
+  - 2
+  train_img_size:
+  - 256
+  - 256
+  - 256
+  train_path: ./data/UIEB/train
+  valid_path: ./data/UIEB/valid
+debug:
+  disable_hsv_conversion: true
+  skip_flops_estimation: true
+model:
+  input_channels: 3
+  output_channels: 3
+optim:
+  cycle_decay: 0.5
+  lr_init: 0.00015
+  lr_min: 1.0e-06
+  use_cycle_limit: false
+  warmup_epochs: 20
+  weight_decay: 1.0e-06
+system:
+  dataloader_persistent_workers: false
+  max_batch_size: 8
+train:
+  ckpt_name: last
+  device: cuda
+  model_name: AquaEnhance
+  resume: false
+  save_dir: ./log
+  seed: 0
+  stage_epochs:
+  - 30
+  - 10
+  - 10
+  task_name: base
+  use_amp: true
+  valid_frequency: 1

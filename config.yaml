@@ -1,0 +1,55 @@
+data:
+  num_workers: 0
+  pin_memory: false
+  train_batch_size:
+    - 2 
+    - 1
+    - 2
+  train_img_size:
+    - 256
+    - 256
+    - 256
+  train_path: "./data/UIEB/train"
+  valid_path: "./data/UIEB/valid"
+  test_path: "./data/UIEB/test"  
+
+optim:
+  cycle_decay: 0.5
+  lr_init: 0.00015
+  lr_min: 1.0e-6
+  use_cycle_limit: false
+  warmup_epochs: 20
+  weight_decay: 1.0e-6
+
+train:
+  ckpt_name: last
+  device: cuda 
+  model_name: AquaEnhance
+  resume: false  # Changed to false for fresh training
+  save_dir: ./log
+  seed: 0
+  stage_epochs:
+    - 30
+    - 10
+    - 10
+  task_name: base
+  use_amp: true  # Enable mixed precision to save memory 
+  valid_frequency: 1
+
+model:
+  input_channels: 3
+  output_channels: 3
+
+system:
+  max_batch_size: 8
+  dataloader_persistent_workers: false
+
+# Additional settings to handle the architecture issue
+debug:
+  skip_flops_estimation: true  # Skip FLOPS calculation to avoid the shape error
+  disable_hsv_conversion: true  # Temporary flag to disable problematic HSV conversion
+  
+# Alternative: If you want to keep resume capability but start fresh
+# train:
+#   ckpt_name: ""  # Empty string to skip checkpoint loading
+#   resume: false
