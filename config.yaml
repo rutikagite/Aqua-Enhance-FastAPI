@@ -30,7 +30,7 @@ train:
   seed: 0
   stage_epochs:
     - 30
-    - 10
+    - 20
     - 10
   task_name: base
   use_amp: true  # Enable mixed precision to save memory 

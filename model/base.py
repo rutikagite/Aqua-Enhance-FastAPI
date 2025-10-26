@@ -7,52 +7,29 @@ from ptflops import get_model_complexity_info
 
 
 class UIA(nn.Module):
-    def __init__(self, channels, ks, num_bins=4):
+    def __init__(self, channels, ks):
         super(UIA, self).__init__()
-        self.num_bins = num_bins  # For grouping brightness levels (clustering-inspired)
-
-        # Pooling for directional attention
-        self.pool_h = nn.AdaptiveAvgPool2d((1, None))   # Horizontal
-        self.pool_v = nn.AdaptiveAvgPool2d((None, 1))   # Vertical
-
-        # Channel-wise brightness adjustment
-        self.channel_conv = nn.Conv2d(channels, channels, 1, bias=False)
-        self.sigmoid = nn.Sigmoid()
-
-        # Combine attention
-        self.combine_conv = nn.Conv2d(channels, channels, ks, padding=ks // 2, padding_mode='reflect', groups=channels, bias=False)
-        self.final_conv = nn.Conv2d(channels, 1, 1)
-        self.final_sigmoid = nn.Sigmoid()
+        self._c_avg = nn.AdaptiveAvgPool2d((1, 1))
+        self._c_conv = nn.Conv2d(channels, channels, 1, bias=False)
+        self._c_sig = nn.Sigmoid()
+        self._h_avg = nn.AdaptiveAvgPool2d((1, None))
+        self._h_conv = nn.Conv2d(channels, channels, 1, groups=channels, bias=False)
+        self._w_avg = nn.AdaptiveAvgPool2d((None, 1))
+        self._w_conv = nn.Conv2d(channels, channels, 1, groups=channels, bias=False)
+        self._hw_conv = nn.Conv2d(channels, channels, ks, padding=ks // 2, padding_mode='reflect',
+                                  groups=channels, bias=False)
+        self._chw_conv = nn.Conv2d(channels, 1, 1, bias=False)
+        self._chw_sig = nn.Sigmoid()
 
     def forward(self, x):
-        with torch.no_grad():
-            if x.shape[1] == 3:
-                hsv = rgb_to_hsv(x)
-            else:
-                hsv = x 
-            brightness = hsv[:, 2:3, :, :]  # V channel [B,1,H,W]
-
-        # Step 2: Cluster brightness into bins
-        bin_width = 1.0 / self.num_bins
-        clustered_brightness = torch.floor(brightness / bin_width) * bin_width  # Like clustering
-
-        # Step 3: Directional attention maps
-        h_attn = self.pool_h(x)
-        v_attn = self.pool_v(x)
-        directional_attn = h_attn + v_attn
-
-        # Step 4: Channel-wise modulation
-        c_attn = self.channel_conv(x)
-        c_attn = self.sigmoid(c_attn)
-
-        # Step 5: Fuse all
-        combined = directional_attn * c_attn * clustered_brightness  # shape [B,C,H,W]
-
-        # Step 6: Refine and weight original input
-        attn_map = self.combine_conv(combined)
-        attn_weight = self.final_sigmoid(self.final_conv(attn_map))
-
-        return x * attn_weight
+        c_map = self._c_conv(self._c_avg(x))
+        c_weight = self._c_sig(c_map)
+        h_map = self._h_conv(self._h_avg(x))
+        w_map = self._w_conv(self._w_avg(x))
+        hw_map = self._hw_conv(w_map @ h_map)
+        chw_map = self._chw_conv(c_weight * hw_map)
+        chw_weight = self._chw_sig(chw_map)
+        return chw_weight * x
 
 
 class NormGate(nn.Module):

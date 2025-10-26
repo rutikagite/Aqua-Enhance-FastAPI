@@ -31,11 +31,21 @@ class MetricRecorder:
 
 
 def save_pics(hparams, source_img, target_img, output_img):
+    """Save images with proper clamping to ensure valid RGB range [0, 1]"""
     base_path = os.path.join(hparams['train']['save_dir'], hparams['train']['model_name'],
                              hparams['train']['task_name'], 'pic')
+    
+    # Clamp all images to valid range [0, 1] before saving
+    source_img = torch.clamp(source_img, 0, 1)
+    target_img = torch.clamp(target_img, 0, 1)
+    output_img = torch.clamp(output_img, 0, 1)
+    
+    # Create grids for visualization
     src = make_grid(source_img)
     tar = make_grid(target_img)
     out = make_grid(output_img)
+    
+    # Save clamped images
     save_image(src, os.path.join(base_path, 'source.png'))
     save_image(tar, os.path.join(base_path, 'target.png'))
     save_image(out, os.path.join(base_path, 'output.png'))
