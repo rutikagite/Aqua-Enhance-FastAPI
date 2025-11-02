@@ -46,11 +46,12 @@ def train_one_epoch(
         with autocast(hparams['train']['use_amp']):
             output_img = model(source_img)
             # Combined loss with multiple criteria
+            # FIXED: Removed source_img from contrast_criterion call
             loss = (
                 0.5 * l1_criterion(output_img, target_img) +
                 0.2 * ssim_criterion(output_img, target_img) +
                 0.15 * perc_criterion(output_img, target_img) +
-                0.1 * contrast_criterion(output_img, target_img, source_img) +
+                0.1 * contrast_criterion(output_img, target_img) +
                 0.05 * freq_criterion(output_img, target_img)
             )
         
@@ -95,11 +96,12 @@ def valid(
         output_img = output_img.clamp(0, 1)
         
         # Combined loss with multiple criteria
+        # FIXED: Removed source_img from contrast_criterion call
         loss = (
             0.5 * l1_criterion(output_img, target_img) +
             0.2 * ssim_criterion(output_img, target_img) +
             0.15 * perc_criterion(output_img, target_img) +
-            0.1 * contrast_criterion(output_img, target_img, source_img) +
+            0.1 * contrast_criterion(output_img, target_img) +
             0.05 * freq_criterion(output_img, target_img)
         )
         
