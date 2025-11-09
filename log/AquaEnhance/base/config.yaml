@@ -37,7 +37,7 @@ train:
   seed: 0
   stage_epochs:
   - 30
-  - 20
+  - 10
   - 10
   task_name: base
   use_amp: true

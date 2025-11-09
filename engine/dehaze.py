@@ -31,12 +31,12 @@ def train_one_epoch(
     model.train()
     loss_recoder = MetricRecorder()
     
-    # Initialize all loss criteria
+    # Initialize all loss criteria with adjusted weights for clarity
     l1_criterion = L1Loss().to(hparams['train']['device'])
     ssim_criterion = SSIMLoss(5).to(hparams['train']['device'])
-    perc_criterion = VGGPerceptualLoss().to(hparams['train']['device'])
+    perc_criterion = VGGPerceptualLoss(feature_layers=[8, 15], resize=False).to(hparams['train']['device'])
     contrast_criterion = ContrastLoss().to(hparams['train']['device'])
-    freq_criterion = FocalFrequencyLoss().to(hparams['train']['device'])
+    freq_criterion = FocalFrequencyLoss(alpha=0.5, patch_factor=1).to(hparams['train']['device'])
     
     for batch in tqdm(train_loader, ncols=120):
         source_img, target_img = batch
@@ -45,23 +45,29 @@ def train_one_epoch(
         
         with autocast(hparams['train']['use_amp']):
             output_img = model(source_img)
-            # Combined loss with multiple criteria
-            # FIXED: Removed source_img from contrast_criterion call
+            
+            # Rebalanced loss weights to prioritize detail preservation
+            # Reduced SSIM weight to avoid over-smoothing
+            # Increased perceptual loss for better detail preservation
             loss = (
-                0.5 * l1_criterion(output_img, target_img) +
-                0.2 * ssim_criterion(output_img, target_img) +
-                0.15 * perc_criterion(output_img, target_img) +
-                0.1 * contrast_criterion(output_img, target_img) +
+                0.6 * l1_criterion(output_img, target_img) +
+                0.05 * ssim_criterion(output_img, target_img) +
+                0.25 * perc_criterion(output_img, target_img) +
+                0.05 * contrast_criterion(output_img, target_img) +
                 0.05 * freq_criterion(output_img, target_img)
             )
         
         optimizer.zero_grad()
         if hparams['train']['use_amp']:
             scaler.scale(loss).backward()
+            # Add gradient clipping to prevent instability
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             scaler.step(optimizer)
             scaler.update()
         else:
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
         loss_recoder.update(loss.item())
     
@@ -81,9 +87,9 @@ def valid(
     # Initialize all loss criteria
     l1_criterion = L1Loss().to(hparams['train']['device'])
     ssim_criterion = SSIMLoss(5).to(hparams['train']['device'])
-    perc_criterion = VGGPerceptualLoss().to(hparams['train']['device'])
+    perc_criterion = VGGPerceptualLoss(feature_layers=[8, 15], resize=False).to(hparams['train']['device'])
     contrast_criterion = ContrastLoss().to(hparams['train']['device'])
-    freq_criterion = FocalFrequencyLoss().to(hparams['train']['device'])
+    freq_criterion = FocalFrequencyLoss(alpha=0.5, patch_factor=1).to(hparams['train']['device'])
     
     for i, batch in enumerate(valid_loader):
         source_img, target_img = batch
@@ -93,15 +99,15 @@ def valid(
         with torch.no_grad():
             output_img = model(source_img)
         
-        output_img = output_img.clamp(0, 1)
+        # Proper clamping to [0, 1] range
+        output_img = torch.clamp(output_img, 0.0, 1.0)
         
-        # Combined loss with multiple criteria
-        # FIXED: Removed source_img from contrast_criterion call
+        # Combined loss with same weights as training
         loss = (
-            0.5 * l1_criterion(output_img, target_img) +
-            0.2 * ssim_criterion(output_img, target_img) +
-            0.15 * perc_criterion(output_img, target_img) +
-            0.1 * contrast_criterion(output_img, target_img) +
+            0.6 * l1_criterion(output_img, target_img) +
+            0.05 * ssim_criterion(output_img, target_img) +
+            0.25 * perc_criterion(output_img, target_img) +
+            0.05 * contrast_criterion(output_img, target_img) +
             0.05 * freq_criterion(output_img, target_img)
         )
         
